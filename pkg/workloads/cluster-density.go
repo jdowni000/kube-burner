@@ -32,6 +32,11 @@ func NewClusterDensity(wh *WorkloadHelper, variant string) *cobra.Command {
 		Use:   variant,
 		Short: fmt.Sprintf("Runs %v workload", variant),
 		PreRun: func(cmd *cobra.Command, args []string) {
+			if variant == "cluster-density-v2" {
+				if !burner.VerifyIngressController(wh.restConfig) {
+					os.Exit(1)
+				}
+			}
 			if !burner.VerifyContainerRegistry(wh.restConfig) {
 				os.Exit(1)
 			}

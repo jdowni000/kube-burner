@@ -161,6 +161,44 @@ func VerifyContainerRegistry(restConfig *rest.Config) bool {
 	return readyFlag
 }
 
+// Verifies ingress controller and reports its status
+func VerifyIngressController(restConfig *rest.Config) bool {
+	// Create an OpenShift client using the default configuration
+	client, err := versioned.NewForConfig(restConfig)
+	if err != nil {
+		log.Error("Error connecting to the openshift cluster", err)
+		return false
+	}
+
+	// Get the ingress controller object
+	ingressController, err := client.ConfigV1().ClusterOperators().Get(context.TODO(), "ingress", metav1.GetOptions{})
+	if err != nil {
+		log.Error("Error getting ingress object:", err)
+		return false
+	}
+	// Check the status conditions
+	logMessage := ""
+	readyFlag := false
+	for _, condition := range ingressController.Status.Conditions {
+		if condition.Type == "Available" && condition.Status == "True" {
+			readyFlag = true
+			logMessage += " up and running"
+		}
+		if condition.Type == "Progressing" && condition.Status == "False" && condition.Reason == "Ready" {
+			logMessage += " and ready to use"
+		}
+		if condition.Type == "Degraded" && condition.Status == "False" && condition.Reason == "AsExpected" {
+			logMessage += " with a healthy state"
+		}
+	}
+	if readyFlag {
+		log.Infof("Cluster ingress controller is%s", logMessage)
+	} else {
+		log.Info("Cluster ingress controller is not up and running")
+	}
+	return readyFlag
+}
+
 // RetryWithExponentialBackOff a utility for retrying the given function with exponential backoff.
 func RetryWithExponentialBackOff(fn wait.ConditionFunc, duration time.Duration, factor, jitter float64, timeout time.Duration) error {
 	steps := int(math.Ceil(math.Log(float64(timeout)/(float64(duration)*(1+jitter))) / math.Log(factor)))
